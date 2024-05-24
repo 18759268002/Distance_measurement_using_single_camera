@@ -1,101 +1,99 @@
-"""
--------------------------------------------
--    Author: Asadullah Dal                -
--    =============================        -
--    Company Name: AiPhile                -
--    =============================        -
--    Purpose : Youtube Channel            -
--    ============================         -
--    Link: https://youtube.com/c/aiphile  -
--------------------------------------------
-"""
-
 import cv2
 
-# variables
-# distance from camera to object(face) measured
-KNOWN_DISTANCE = 76.2  # centimeter
-# width of face in the real world or Object Plane
-KNOWN_WIDTH = 14.3  # centimeter
-# Colors
+# 变量
+# 从摄像头到物体（面部）的距离（测量）
+KNOWN_DISTANCE = 76.2  # 厘米
+# 真实世界中面部的宽度
+KNOWN_WIDTH = 14.3  # 厘米
+# 颜色
 GREEN = (0, 255, 0)
 RED = (0, 0, 255)
 WHITE = (255, 255, 255)
 fonts = cv2.FONT_HERSHEY_COMPLEX
 cap = cv2.VideoCapture(1)
 
-# face detector object
+# 面部检测对象
 face_detector = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
 
 
-# focal length finder function
+# 焦距计算函数
 def focal_length(measured_distance, real_width, width_in_rf_image):
     """
-    This Function Calculate the Focal Length(distance between lens to CMOS sensor), it is simple constant we can find by using
-    MEASURED_DISTACE, REAL_WIDTH(Actual width of object) and WIDTH_OF_OBJECT_IN_IMAGE
-    :param1 Measure_Distance(int): It is distance measured from object to the Camera while Capturing Reference image
+    这个函数计算焦距（从镜头到CMOS传感器的距离），可以使用测量距离、实际宽度和图像中物体的宽度找到这个常数
+    :param1 Measure_Distance(int): 在捕获参考图像时，从物体到摄像头的测量距离
 
-    :param2 Real_Width(int): It is Actual width of object, in real world (like My face width is = 14.3 centimeters)
-    :param3 Width_In_Image(int): It is object width in the frame /image in our case in the reference image(found by Face detector)
-    :retrun focal_length(Float):"""
+    :param2 Real_Width(int): 物体的实际宽度，在现实世界中（例如我的面部宽度是14.3厘米）
+    :param3 Width_In_Image(int): 图像中物体的宽度（通过面部检测器找到的参考图像中的宽度）
+    :return focal_length(Float): 返回焦距
+    """
     focal_length_value = (width_in_rf_image * measured_distance) / real_width
     return focal_length_value
 
 
-# distance estimation function
+# 距离估算函数
 def distance_finder(focal_length, real_face_width, face_width_in_frame):
     """
-    This Function simply Estimates the distance between object and camera using arguments(focal_length, Actual_object_width, Object_width_in_the_image)
-    :param1 focal_length(float): return by the focal_length_Finder function
+    这个函数简单估算物体和摄像头之间的距离，使用参数（焦距、实际物体宽度、图像中的物体宽度）
+    :param1 focal_length(float): 由焦距计算函数返回的值
 
-    :param2 Real_Width(int): It is Actual width of object, in real world (like My face width is = 5.7 Inches)
-    :param3 object_Width_Frame(int): width of object in the image(frame in our case, using Video feed)
-    :return Distance(float) : distance Estimated
+    :param2 Real_Width(int): 物体的实际宽度，在现实世界中（例如我的面部宽度是5.7英寸）
+    :param3 object_Width_Frame(int): 图像中物体的宽度（使用视频流）
+    :return Distance(float) : 返回估算的距离
     """
     distance = (real_face_width * focal_length) / face_width_in_frame
     return distance
 
 
-# face detector function
+# 面部检测函数
 def face_data(image):
     """
-    This function Detect the face
-    :param Takes image as argument.
-    :returns face_width in the pixels
+    这个函数检测面部
+    :param 接受图像作为参数
+    :returns 面部宽度（像素）
     """
 
     face_width = 0
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = face_detector.detectMultiScale(gray_image, 1.3, 5)
-    for (x, y, h, w) in faces:
+    for x, y, h, w in faces:
         cv2.rectangle(image, (x, y), (x + w, y + h), WHITE, 1)
         face_width = w
 
     return face_width
 
 
-# reading reference image from directory
+# 从目录中读取参考图像
 ref_image = cv2.imread("Ref_image.png")
+if ref_image is None:
+    print("Error: Could not read the reference image.")
+    exit()
 
 ref_image_face_width = face_data(ref_image)
+if ref_image_face_width == 0:
+    print("Error: Could not detect a face in the reference image.")
+    exit()
+
 focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, ref_image_face_width)
-print(focal_length_found)
-cv2.imshow("ref_image", ref_image)
+print(f"Focal Length: {focal_length_found}")
+cv2.imshow("Reference Image", ref_image)
 
-while True:
-    _, frame = cap.read()
+# 从目录中读取要检测的图像
+test_image = cv2.imread("test.jpeg")
+if test_image is None:
+    print("Error: Could not read the test image.")
+    exit()
 
-    # calling face_data function
-    face_width_in_frame = face_data(frame)
-    # finding the distance by calling function Distance
-    if face_width_in_frame != 0:
-        Distance = distance_finder(focal_length_found, KNOWN_WIDTH, face_width_in_frame)
-        # Drwaing Text on the screen
-        cv2.putText(
-            frame, f"Distance = {round(Distance,2)} CM", (50, 50), fonts, 1, (WHITE), 2
-        )
-    cv2.imshow("frame", frame)
-    if cv2.waitKey(1) == ord("q"):
-        break
-cap.release()
+face_width_in_test_image = face_data(test_image)
+if face_width_in_test_image != 0:
+    Distance = distance_finder(
+        focal_length_found, KNOWN_WIDTH, face_width_in_test_image
+    )
+    cv2.putText(
+        test_image, f"Distance = {round(Distance, 2)} CM", (50, 50), fonts, 1, WHITE, 2
+    )
+else:
+    print("Error: Could not detect a face in the test image.")
+
+cv2.imshow("Test Image", test_image)
+cv2.waitKey(0)
 cv2.destroyAllWindows()
